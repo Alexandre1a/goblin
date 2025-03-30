@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -106,6 +107,24 @@ func InstallPackage(pkg Package, forceBuild bool) error {
 	//return fmt.Errorf("erreur lors du téléchargement : %v", err)
 	//}
 	fmt.Printf("Le package %s a été téléchargé avec succès.\n", pkg.Name)
+	postInstall(pkg.Name)
+	return nil
+}
+
+func postInstall(pkg string) error {
+	newpath := filepath.Join(".", "bin")
+	err := os.MkdirAll(newpath, os.ModePerm)
+	binDir := "./bin"
+	basePath := pkg
+	finalPath := binDir + "/" + pkg
+	e := os.Rename(basePath, finalPath)
+	if e != nil {
+		log.Fatal(e)
+	}
+	err = os.Chmod(finalPath, 0700)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return nil
 }
 
