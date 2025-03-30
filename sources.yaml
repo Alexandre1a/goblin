@@ -1,0 +1,17 @@
+packages:
+  - name: "gosh"
+    version: "latest"
+    base_url: "https://github.com/Alexandre1a/GoSH/releases/latest/download/"
+    artifacts:
+      - os: "linux"
+        arch: "amd64"
+        file: "gosh-linux-amd64"
+      - os: "linux"
+        arch: "arm64"
+        file: "gosh-linux-arm64"
+      - os: "darwin"
+        arch: "amd64"
+        file: "gosh-mac-amd64"
+      - os: "darwin"
+        arch: "arm64"
+        file: "gosh-mac-arm64"
