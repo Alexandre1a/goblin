@@ -1,3 +1,5 @@
+github.com/pbnjay/reachable v0.0.0-20160515041236-e8ded6bc6183 h1:x6RnCViZEPOt7XErvldrdM5UB1j7zNfL1TkBS1Fq2Q0=
+github.com/pbnjay/reachable v0.0.0-20160515041236-e8ded6bc6183/go.mod h1:X35N4+D9AzUCxCyAprexJn2eQLZmeNGWNFLm7wj8mgo=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=

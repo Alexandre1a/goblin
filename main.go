@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v2"
+	// To check network connectivity
 )
 
 // Artifact représente un artefact de release pour un package.
