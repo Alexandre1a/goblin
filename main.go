@@ -68,6 +68,56 @@ const (
 	LockFilePath = "goblin.lock"
 )
 
+const (
+	ManifestDir    = ".config/goblin"
+	ManifestName   = "sources.yaml"
+	RawManifestURL = "https://raw.githubusercontent.com/Alexandre1a/goblin-remote/refs/heads/main/sources.yml"
+)
+
+// EnsureManifest vérifie et télécharge le manifest si nécessaire
+func EnsureManifest() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("erreur répertoire utilisateur: %v", err)
+	}
+
+	manifestPath := filepath.Join(homeDir, ManifestDir, ManifestName)
+	altManifestPath := filepath.Join(homeDir, ManifestDir, "sources.yml")
+
+	// Vérifier si un manifest existe déjà
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		if _, err := os.Stat(altManifestPath); os.IsNotExist(err) {
+			// Créer le répertoire
+			dir := filepath.Join(homeDir, ManifestDir)
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("erreur création répertoire: %v", err)
+			}
+
+			// Télécharger le manifest
+			resp, err := http.Get(RawManifestURL)
+			if err != nil {
+				return fmt.Errorf("erreur connexion GitHub: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("erreur HTTP %d", resp.StatusCode)
+			}
+
+			file, err := os.Create(manifestPath)
+			if err != nil {
+				return fmt.Errorf("erreur création fichier: %v", err)
+			}
+			defer file.Close()
+
+			if _, err := io.Copy(file, resp.Body); err != nil {
+				return fmt.Errorf("erreur écriture fichier: %v", err)
+			}
+		}
+	}
+	return nil
+}
+
 // LoadManifest lit et parse le fichier manifest depuis le chemin spécifié.
 func LoadManifest(path string) (*Manifest, error) {
 	data, err := ioutil.ReadFile(path)
@@ -624,6 +674,10 @@ func main() {
 		fmt.Println("  remove <package>             - Désinstalle un package")
 		fmt.Println("  sync                         - Synchronise les binaires manquants")
 		os.Exit(1)
+	}
+
+	if err := EnsureManifest(); err != nil {
+		log.Fatalf("Erreur initialisation: %v", err)
 	}
 
 	command := os.Args[1]
