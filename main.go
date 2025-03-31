@@ -201,7 +201,21 @@ func GetActualVersion(resp *http.Response, filename string, pkgName string, mani
 	return manifestVersion
 }
 
+func CheckConnectivity() error {
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	_, err := client.Head("https://github.com")
+	if err != nil {
+		return fmt.Errorf("pas de connexion Internet")
+	}
+	return nil
+}
+
 func DownloadFile(url string, filepath string, pkgName string, manifestVersion string) (string, error) {
+	if err := CheckConnectivity(); err != nil {
+		return "", fmt.Errorf("vérification de connectivité échouée : %v", err)
+	}
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
@@ -315,6 +329,38 @@ func InstallPackage(pkg Package, forceBuild bool) error {
 	}
 
 	fmt.Printf("Le package %s (version %s) a été enregistré dans le fichier lock.\n", pkg.Name, actualVersion)
+
+	return nil
+}
+
+func UninstallPackage(pkgName string) error {
+	lockFile, err := LoadLockFile()
+	if err != nil {
+		return fmt.Errorf("erreur lors du chargement du fichier lock : %v", err)
+	}
+
+	found := false
+	for i, pkg := range lockFile.Packages {
+		if strings.EqualFold(pkg.Name, pkgName) {
+			// Supprimer le binaire
+			if err := os.Remove(pkg.Path); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("erreur lors de la suppression du binaire : %v", err)
+			}
+
+			// Supprimer du lock file
+			lockFile.Packages = append(lockFile.Packages[:i], lockFile.Packages[i+1:]...)
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("package '%s' non installé", pkgName)
+	}
+
+	if err := SaveLockFile(lockFile); err != nil {
+		return fmt.Errorf("erreur lors de la sauvegarde du lock file : %v", err)
+	}
 
 	return nil
 }
@@ -453,6 +499,49 @@ func UpdatePackage(pkgName string, manifest *Manifest, force bool) (*UpdateResul
 	}, nil
 }
 
+func SyncPackages(manifest *Manifest) ([]*UpdateResult, error) {
+	lockFile, err := LoadLockFile()
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors du chargement du fichier lock : %v", err)
+	}
+
+	var results []*UpdateResult
+
+	for _, installedPkg := range lockFile.Packages {
+		if _, err := os.Stat(installedPkg.Path); os.IsNotExist(err) {
+			fmt.Printf("Binaire manquant pour %s, réinstallation...\n", installedPkg.Name)
+
+			// Trouver le package dans le manifest
+			var pkg *Package
+			for i, mpkg := range manifest.Packages {
+				if mpkg.Name == installedPkg.Name {
+					pkg = &manifest.Packages[i]
+					break
+				}
+			}
+
+			if pkg == nil {
+				results = append(results, &UpdateResult{
+					Name:    installedPkg.Name,
+					Status:  "error",
+					Message: "Package non trouvé dans le manifest",
+				})
+				continue
+			}
+
+			// Réinstaller le package
+			result, err := UpdatePackage(pkg.Name, manifest, true)
+			if err != nil {
+				results = append(results, result)
+				continue
+			}
+			results = append(results, result)
+		}
+	}
+
+	return results, nil
+}
+
 // UpdateAllPackages met à jour tous les packages installés
 func UpdateAllPackages(manifest *Manifest, force bool) ([]*UpdateResult, error) {
 	// Charger le fichier de verrouillage
@@ -532,6 +621,8 @@ func main() {
 		fmt.Println("  install <package> [--build]  - Installe un package")
 		fmt.Println("  update [package] [--force]   - Met à jour un package ou tous les packages")
 		fmt.Println("  list                         - Liste les packages installés")
+		fmt.Println("  remove <package>             - Désinstalle un package")
+		fmt.Println("  sync                         - Synchronise les binaires manquants")
 		os.Exit(1)
 	}
 
@@ -649,6 +740,33 @@ func main() {
 	case "list":
 		if err := ListPackages(); err != nil {
 			log.Fatalf("Erreur lors de l'affichage des packages : %v", err)
+		}
+
+	case "remove":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: goblin remove <package>")
+			os.Exit(1)
+		}
+		pkgName := os.Args[2]
+		if err := UninstallPackage(pkgName); err != nil {
+			log.Fatalf("Erreur lors de la désinstallation : %v", err)
+		}
+		fmt.Printf("Package %s désinstallé avec succès\n", pkgName)
+
+	case "sync":
+		manifest, err := LoadManifest("sources.yaml")
+		if err != nil {
+			log.Fatalf("Erreur lors du chargement du manifest : %v", err)
+		}
+
+		results, err := SyncPackages(manifest)
+		if err != nil {
+			log.Fatalf("Erreur lors de la synchronisation : %v", err)
+		}
+
+		fmt.Println("\nRésultats de la synchronisation:")
+		for _, result := range results {
+			fmt.Printf("- %s : %s (%s)\n", result.Name, result.Status, result.Message)
 		}
 
 	default:
