@@ -262,6 +262,54 @@ func CheckConnectivity() error {
 	return nil
 }
 
+func UpdateManifest() error {
+	if err := CheckConnectivity(); err != nil {
+		return fmt.Errorf("pas de connexion Internet : %v", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("erreur répertoire utilisateur: %v", err)
+	}
+
+	manifestPath := filepath.Join(homeDir, ManifestDir, ManifestName)
+
+	// Télécharger le nouveau manifest
+	resp, err := http.Get(RawManifestURL)
+	if err != nil {
+		return fmt.Errorf("erreur de connexion à GitHub: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("erreur HTTP %d", resp.StatusCode)
+	}
+
+	newData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("erreur de lecture: %v", err)
+	}
+
+	// Valider le format YAML
+	var testManifest Manifest
+	if err := yaml.Unmarshal(newData, &testManifest); err != nil {
+		return fmt.Errorf("manifest invalide: %v", err)
+	}
+
+	// Écraser le fichier existant
+	if err := ioutil.WriteFile(manifestPath, newData, 0644); err != nil {
+		return fmt.Errorf("erreur d'écriture: %v", err)
+	}
+
+	// Supprimer l'ancienne version .yml si existante
+	ymlPath := filepath.Join(homeDir, ManifestDir, "sources.yml")
+	if _, err := os.Stat(ymlPath); err == nil {
+		os.Remove(ymlPath)
+	}
+
+	return nil
+}
+
 func DownloadFile(url string, filepath string, pkgName string, manifestVersion string) (string, error) {
 	if err := CheckConnectivity(); err != nil {
 		return "", fmt.Errorf("vérification de connectivité échouée : %v", err)
@@ -664,15 +712,19 @@ func ListPackages() error {
 	return nil
 }
 
+func Help() {
+	fmt.Println("Usage: goblin <command> [args]")
+	fmt.Println("Commandes disponibles:")
+	fmt.Println("  install <package> [--build]  - Installe un package")
+	fmt.Println("  remove <package>             - Désinstalle un package")
+	fmt.Println("  update [package] [--force]   - Met à jour un package ou tous les packages")
+	fmt.Println("  sync                         - Synchronise les binaires manquants")
+	fmt.Println("  list                         - Liste les packages installés")
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: goblin <command> [args]")
-		fmt.Println("Commandes disponibles:")
-		fmt.Println("  install <package> [--build]  - Installe un package")
-		fmt.Println("  update [package] [--force]   - Met à jour un package ou tous les packages")
-		fmt.Println("  list                         - Liste les packages installés")
-		fmt.Println("  remove <package>             - Désinstalle un package")
-		fmt.Println("  sync                         - Synchronise les binaires manquants")
+		Help()
 		os.Exit(1)
 	}
 
@@ -694,7 +746,6 @@ func main() {
 		packageName := args[0]
 		homeDir, err := os.UserHomeDir()
 		manifestDir := filepath.Join(homeDir, ".config", "goblin")
-
 		manifest, err := LoadManifest(manifestDir + "/sources.yaml")
 		if err != nil {
 			log.Fatalf("Erreur lors du chargement du manifest : %v", err)
@@ -716,15 +767,23 @@ func main() {
 		}
 
 	case "update":
+		fmt.Println("Vérification des mises à jour du manifest...")
+		if err := UpdateManifest(); err != nil {
+			log.Printf("⚠️ Impossible de mettre à jour le manifest : %v", err)
+			log.Println("Utilisation de la version locale existante...")
+		}
+
+		// Charger le nouveau manifest
+		homeDir, err := os.UserHomeDir()
+		manifestDir := filepath.Join(homeDir, ".config", "goblin")
+		manifest, err := LoadManifest(manifestDir + "/sources.yaml")
+		if err != nil {
+			log.Fatalf("Erreur lors du chargement du manifest : %v", err)
+		}
 		updateCmd := flag.NewFlagSet("update", flag.ExitOnError)
 		forceUpdate := updateCmd.Bool("force", false, "Force la mise à jour même si la version est identique")
 		updateCmd.Parse(os.Args[2:])
 		args := updateCmd.Args()
-
-		manifest, err := LoadManifest("sources.yaml")
-		if err != nil {
-			log.Fatalf("Erreur lors du chargement du manifest : %v", err)
-		}
 
 		if len(args) > 0 {
 			// Mettre à jour un package spécifique
@@ -825,10 +884,7 @@ func main() {
 
 	default:
 		fmt.Printf("Commande inconnue : %s\n", command)
-		fmt.Println("Commandes disponibles:")
-		fmt.Println("  install <package> [--build]  - Installe un package")
-		fmt.Println("  update [package] [--force]   - Met à jour un package ou tous les packages")
-		fmt.Println("  list                         - Liste les packages installés")
+		Help()
 		os.Exit(1)
 	}
 }
