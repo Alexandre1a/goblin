@@ -65,31 +65,38 @@ type UpdateResult struct {
 
 // Constantes pour le fichier de verrouillage
 const (
-	LockFilePath = "goblin.lock"
+	GoblinBaseDir   = ".goblin"
+	BinDirName      = "bin"
+	ManifestDirName = "manifest"
+	ManifestName    = "sources.yaml"
+	LockFilePath    = "goblin.lock"
+	RawManifestURL  = "https://raw.githubusercontent.com/Alexandre1a/goblin-remote/refs/heads/main/sources.yml"
 )
 
-const (
-	ManifestDir    = ".config/goblin"
-	ManifestName   = "sources.yaml"
-	RawManifestURL = "https://raw.githubusercontent.com/Alexandre1a/goblin-remote/refs/heads/main/sources.yml"
-)
+func GetGoblinDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("erreur répertoire utilisateur: %v", err)
+	}
+	return filepath.Join(homeDir, GoblinBaseDir), nil
+}
 
 // EnsureManifest vérifie et télécharge le manifest si nécessaire
 func EnsureManifest() error {
-	homeDir, err := os.UserHomeDir()
+	goblinDir, err := GetGoblinDir()
 	if err != nil {
-		return fmt.Errorf("erreur répertoire utilisateur: %v", err)
+		return err
 	}
 
-	manifestPath := filepath.Join(homeDir, ManifestDir, ManifestName)
-	altManifestPath := filepath.Join(homeDir, ManifestDir, "sources.yml")
+	manifestDir := filepath.Join(goblinDir, ManifestDirName)
+	manifestPath := filepath.Join(manifestDir, ManifestName)
+	altManifestPath := filepath.Join(manifestDir, "sources.yml")
 
 	// Vérifier si un manifest existe déjà
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
 		if _, err := os.Stat(altManifestPath); os.IsNotExist(err) {
 			// Créer le répertoire
-			dir := filepath.Join(homeDir, ManifestDir)
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if err := os.MkdirAll(manifestDir, 0755); err != nil {
 				return fmt.Errorf("erreur création répertoire: %v", err)
 			}
 
@@ -133,14 +140,21 @@ func LoadManifest(path string) (*Manifest, error) {
 
 // LoadLockFile charge le fichier de verrouillage s'il existe.
 func LoadLockFile() (*LockFile, error) {
+	goblinDir, err := GetGoblinDir()
+	if err != nil {
+		return nil, err
+	}
+
+	lockFilePath := filepath.Join(goblinDir, LockFilePath)
+
 	// Vérifier si le fichier existe
-	if _, err := os.Stat(LockFilePath); os.IsNotExist(err) {
+	if _, err := os.Stat(lockFilePath); os.IsNotExist(err) {
 		// Créer un nouveau fichier de verrouillage vide
 		return &LockFile{Packages: []InstalledPackage{}}, nil
 	}
 
 	// Lire le fichier existant
-	data, err := ioutil.ReadFile(LockFilePath)
+	data, err := ioutil.ReadFile(lockFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("erreur lors de la lecture du fichier lock : %v", err)
 	}
@@ -155,12 +169,19 @@ func LoadLockFile() (*LockFile, error) {
 
 // SaveLockFile enregistre le fichier de verrouillage.
 func SaveLockFile(lockFile *LockFile) error {
+	goblinDir, err := GetGoblinDir()
+	if err != nil {
+		return err
+	}
+
+	lockFilePath := filepath.Join(goblinDir, LockFilePath)
+
 	data, err := json.MarshalIndent(lockFile, "", "  ")
 	if err != nil {
 		return fmt.Errorf("erreur lors de la sérialisation du fichier lock : %v", err)
 	}
 
-	if err = ioutil.WriteFile(LockFilePath, data, 0644); err != nil {
+	if err = ioutil.WriteFile(lockFilePath, data, 0644); err != nil {
 		return fmt.Errorf("erreur lors de l'écriture du fichier lock : %v", err)
 	}
 
@@ -251,16 +272,7 @@ func GetActualVersion(resp *http.Response, filename string, pkgName string, mani
 	return manifestVersion
 }
 
-func CheckConnectivity() error {
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	_, err := client.Head("https://github.com")
-	if err != nil {
-		return fmt.Errorf("pas de connexion Internet")
-	}
-	return nil
-}
+
 
 func UpdateManifest() error {
 	if err := CheckConnectivity(); err != nil {
