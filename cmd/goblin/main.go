@@ -3,6 +3,8 @@ package main
 
 import (
 	"os"
+
+	"github.com/alexandre1a/goblin/internal/utils/checks"
 )
 
 // All consts
@@ -18,10 +20,9 @@ const (
 var homeDir, err = os.UserHomeDir()
 
 func Init() {
-	if CheckConnectivity != error {
+	if checks.CheckConnectivity() != nil {
 		isConnected := true
-	}
-	else {
+	} else {
 		isConnected := false
 	}
 }

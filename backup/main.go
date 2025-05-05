@@ -322,43 +322,6 @@ func UpdateManifest() error {
 	return nil
 }
 
-func DownloadFile(url string, filepath string, pkgName string, manifestVersion string) (string, error) {
-	if err := CheckConnectivity(); err != nil {
-		return "", fmt.Errorf("vérification de connectivité échouée : %v", err)
-	}
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return "", err
-	}
-	defer out.Close()
-
-	// Get the data
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	// Check if the response is successful
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("téléchargement échoué avec le code %d", resp.StatusCode)
-	}
-
-	// Write the body to file
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	// Extraire le nom de fichier de l'URL
-	filename := url[strings.LastIndex(url, "/")+1:]
-
-	// Obtenir la version réelle
-	actualVersion := GetActualVersion(resp, filename, pkgName, manifestVersion)
-
-	return actualVersion, nil
-}
 
 // InstallPackage télécharge l'artefact correspondant à l'OS et à l'architecture actuels.
 func InstallPackage(pkg Package, forceBuild bool) error {

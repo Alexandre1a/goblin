@@ -1,7 +1,14 @@
 package common
 
-func DownloadFile(url string, filepath string, pkgName string ) error {
-	if isConnected !== true {
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+func DownloadFile(url string, filepath string, pkgName string) error {
+	if isConnected != true {
 		return nil
 	}
 	// Create the file
@@ -20,7 +27,7 @@ func DownloadFile(url string, filepath string, pkgName string ) error {
 
 	// Check if the response is successful
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("téléchargement échoué avec le code %d", resp.StatusCode)
+		return "", fmt.Errorf("Download failed with code %d", resp.StatusCode)
 	}
 
 	// Write the body to file
