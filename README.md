@@ -17,12 +17,12 @@ Add the build directory to your PATH environment variable.
 
 # Usage  
 ## Install a package  
-    To install a package, just run `goblin install <package>` in your terminal.  
+To install a package, just run `goblin install <package>` in your terminal.  
 ## Uninstall a package  
-    To uninstall a package, just run `goblin remove <package>` in your terminal.  
+To uninstall a package, just run `goblin remove <package>` in your terminal.  
 ## Update a package  
-    To update a package, just run `goblin update <package>` in your terminal.  
-    The `<package>` field in the update can be empty, to update all pacakages.  
+To update a package, just run `goblin update <package>` in your terminal.  
+The `<package>` field in the update can be empty, to update all pacakages.  
 # Features  
 At the moment, it has basic features like downloading packages and installing them.  
 Use `goblin sync` to sync packages from a lock file.  
